@@ -37,11 +37,11 @@ async function run() {
     // const paymentCollection = client.db("bistroDb").collection("payments");
 
      // jwt related api
-//      app.post('/jwt', async (req, res) => {
-//       const user = req.body;
-//       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '20h' });
-//       res.send({ token });
-//     })
+     app.post('/jwt', async (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '20h' });
+      res.send({ token });
+    })
 
 //     // middlewares 
     const verifyToken = (req, res, next) => {
