@@ -138,12 +138,7 @@ async function run() {
   //     res.send(result);
   // });
   
-//   app.get('/contests', async (req, res) => {
-//     const tag = req.query.tag;
-//     const query = tag ? { tags: tag } : {};
-//     const result = await contestCollection.find(query).toArray();
-//     res.send(result);
-// });
+
 
 app.get('/contests', async (req, res) => {
   const tag = req.query.tag;
@@ -152,6 +147,13 @@ app.get('/contests', async (req, res) => {
   const result = await contestCollection.find(query).toArray();
   res.send(result);
 });
+// // to find single (read)
+app.get('/contests/:id', async (req, res) => {
+  const id = req.params.id;
+  const query = { _id: new ObjectId(id) }
+  const result = await contestCollection.findOne(query);
+  res.send(result);
+})
 
 
 
