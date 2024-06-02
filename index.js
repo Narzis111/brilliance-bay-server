@@ -128,18 +128,7 @@ async function run() {
 
     // main contest api
 
-  //   app.get('/contests', async (req, res) => {
-  //     const tag = req.query.tag;
-  //     let query = {};
-  //     if (tag) {
-  //         query = { tags: { $regex: tag, $options: 'i' } }; // Case-insensitive search
-  //     }
-  //     const result = await contestCollection.find(query).toArray();
-  //     res.send(result);
-  // });
   
-
-
 app.get('/contests', async (req, res) => {
   const tag = req.query.tag;
   console.log(`Querying contests with tag: ${tag}`); // Add this line
