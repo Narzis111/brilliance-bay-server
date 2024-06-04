@@ -196,12 +196,7 @@ app.get('/contests', async (req, res) => {
   res.send(result);
 });
 // // to find single (read)
-app.get('/contests/:id', async (req, res) => {
-  const id = req.params.id;
-  const query = { _id: new ObjectId(id) }
-  const result = await contestCollection.findOne(query);
-  res.send(result);
-})
+
 
 app.post('/contests', async (req, res) => {
   const item = req.body;
