@@ -178,13 +178,7 @@ app.get('/users', async (req, res) => {
 //     });
 // user's role update. only admin parbe
    
-// // user delete. only admin parbe
-    app.delete('/users/:id', async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) }
-      const result = await usersCollection.deleteOne(query);
-      res.send(result);
-    })
+// 
 
     // main contest api
 
