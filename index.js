@@ -41,36 +41,8 @@ async function run() {
     const usersCollection = client.db("contestHubDB").collection("users");
     const contestCollection = client.db("contestHubDB").collection("contests");
     const bookingsCollection = client.db("contestHubDB").collection("bookings");
-    // const submitCollection = client.db("contestHubDB").collection("submit");
-
-    // verify admin middleware
-    const verifyAdmin = async (req, res, next) => {
-      console.log('hello');
-      const user = req.user
-      const query = { email: email }
-      const result = await usersCollection.findOne(query)
-      console.log(result?.role)
-      if (!result || result?.role !== 'admin')
-        return res.status(401).send({ message: 'unauthorized access!!' })
-
-      next()
-    }
-    // verify creator middleware
-    const verifyCreator = async (req, res, next) => {
-      console.log('hello')
-      const user = req.user
-      const query = { email: email }
-      const result = await usersCollection.findOne(query)
-      console.log(result?.role)
-      if (!result || result?.role !== 'creator') {
-        return res.status(401).send({ message: 'unauthorized access!!' })
-      }
-
-      next()
-    }
-
-
-
+ 
+ 
 
     // jwt related api
     app.post('/jwt', async (req, res) => {
@@ -81,63 +53,44 @@ async function run() {
 
     //     // middlewares 
     // Verify Token Middleware
-    const verifyToken = async (req, res, next) => {
-      const token = req.cookies?.token
-      console.log(token)
-      if (!token) {
-        return res.status(401).send({ message: 'unauthorized access' })
+    const verifyToken = (req, res, next) => {
+      // console.log('inside verify token', req.headers.authorization);
+      if (!req.headers.authorization) {
+        return res.status(401).send({ message: 'unauthorized access' });
       }
-      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
-        if (err) {
-          console.log(err)
+      const token = req.headers.authorization.split(' ')[1];
+      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (error, decoded) => {
+        if (error) {
           return res.status(401).send({ message: 'unauthorized access' })
         }
-        req.user = decoded
-        next()
+        req.decoded = decoded;
+        next();
       })
     }
 
-
-    // ============submit task api
-    // submit task used here only creator will show
-
-
-
-
-    app.get('/submit/:id', verifyToken, async (req, res) => {
-      console.log('valid user', req.user);
-
-      // Ensure that only authenticated users can access this route
-      if (!req.user) {
-        return res.status(401).json({ message: 'Unauthorized' });
+    // use verify admin after verifyToken
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      const isAdmin = user?.role === 'admin';
+      if (!isAdmin) {
+        return res.status(403).send({ message: 'forbidden access' });
       }
+      next();
+    }
 
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) }; // Ensure the submission belongs to the authenticated user
-      const result = await submitCollection.findOne(query);
-
-      if (!result) {
-        return res.status(404).json({ message: 'Submission not found' });
+    // use verify creator after verifyToken
+    const verifyCreator = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      const isCreator = user?.role === 'creator';
+      if (!isCreator) {
+        return res.status(403).send({ message: 'forbidden access' });
       }
-
-      res.send(result);
-    });
-    app.get('/submit', verifyToken, async (req, res) => {
-      console.log('valid cookies', req.cookies);
-      if (!req.user) {
-        return res.status(401).json({ message: 'Unauthorized' });
-      }
-      const cursor = submitCollection.find();
-      const result = await cursor.toArray();
-      res.send(result);
-    })
-  
-    app.post('/submit', async (req, res) => {
-      const submitted = req.body;
-      console.log(submitted);
-      const result = await submitCollection.insertOne(submitted);
-      res.send(result);
-    });
+      next();
+    }
 
 
 
@@ -182,51 +135,13 @@ async function run() {
 
     // get all users data from db
     app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
-      console.log(req.headers);
+      // console.log(req.headers);
       const result = await usersCollection.find().toArray()
       res.send(result)
     })
 
 
-
-    //     app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
-    //       console.log(req.headers);
-    //       const result = await userCollection.find().toArray();
-    //       res.send(result);
-    //     });
-    // // admin user api
-    //     app.get('/users/admin/:email', verifyToken, async (req, res) => {
-    //       const email = req.params.email;
-
-    //       if (email !== req.decoded.email) {
-    //         return res.status(403).send({ message: 'forbidden access' })
-    //       }
-
-    //       const query = { email: email };
-    //       const user = await userCollection.findOne(query);
-    //       let admin = false;
-    //       if (user) {
-    //         admin = user?.role === 'admin';
-    //       }
-    //       res.send({ admin });
-    //     })
-
-    //     app.post('/users', async (req, res) => {
-    //       const user = req.body;
-    //       // insert email if user doesnt exists: 
-    //       // you can do this many ways (1. email unique, 2. upsert 3. simple checking)
-    //       const query = { email: user.email }
-    //       const existingUser = await userCollection.findOne(query);
-    //       if (existingUser) {
-    //         return res.send({ message: 'user already exists', insertedId: null })
-    //       }
-    //       const result = await userCollection.insertOne(user);
-    //       res.send(result);
-    //     });
-    // user's role update. only admin parbe
-
-    // // user delete. only admin parbe
-    app.delete('/users/:id', async (req, res) => {
+app.delete('/users/:id', verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await usersCollection.deleteOne(query);
@@ -279,7 +194,7 @@ async function run() {
     });
 
     // update numberOfParticipants
-    app.patch('/contests/participantIncrease/:id', async (req, res) => {
+    app.patch('/contests/participantIncrease/:id', verifyToken, async (req, res) => {
       const id = req.params.id
       // increase numberOfParticipants by one for each single payment
       const query = { _id: new ObjectId(id) }
@@ -291,7 +206,7 @@ async function run() {
     })
     // update numberOfWinner
  
-    app.patch('/contests-winner/:id', async (req, res) => {
+    app.patch('/contests-winner/:id',verifyToken, async (req, res) => {
       try {
           const id = req.params.id;
           const { review_status, contestName } = req.body;
@@ -339,7 +254,7 @@ async function run() {
                     count: { $sum: 1 },
                     user_name: { $first: "$user_name" },
                     user_email: { $first: "$user_email" },
-                    photoURL: { $first: "$photoURL" }
+                    user_photo: { $first: "$user_photo" }
                 }
             },
             {
@@ -368,7 +283,7 @@ app.get('/top-creators', async (req, res) => {
                   totalParticipants: { $sum: "$numberOfParticipants" },
                   creator_name: { $first: "$creator_name" },
                   creator_email: { $first: "$creator_email" },
-                  photoURL: { $first: "$photoURL" }
+                  creator_photo: { $first: "$creator_photo" }
               }
           },
           {
@@ -387,13 +302,9 @@ app.get('/top-creators', async (req, res) => {
   }
 });
 
-
-
-    
-
     // added comment 
 
-    app.patch('/contests/update/:id', async (req, res) => {
+    app.patch('/contests/update/:id', verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id
       const { comment } = req.body
 
@@ -411,7 +322,7 @@ app.get('/top-creators', async (req, res) => {
       res.send(result)
 
     })
-    app.patch('/booking/taskview/:id', async (req, res) => {
+    app.patch('/booking/taskview/:id', verifyToken, async (req, res) => {
       const id = req.params.id;
       const data = req.body;
       const query = { _id: new ObjectId(id) };
@@ -444,23 +355,14 @@ app.get('/top-creators', async (req, res) => {
     });
 
     // get all contest for creator
-    app.get('/myCreated/:email', async (req, res) => {
+    app.get('/myCreated/:email',verifyToken, verifyCreator, async (req, res) => {
       const email = req.params.email
       let query = { creator_email: email }
       const result = await contestCollection.find(query).toArray()
       res.send(result)
     })
-      // final booking sorting for creator****************
-      // app.get('/userchart/:email', async (req, res) => {
-      //   const email = req.params.email;
-      //   const query = {
-      //     user_email: email,
-      //     review_status: { $exists: true }
-      //   };
-      //   const result = await bookingsCollection.find(query).toArray();
-      //   res.send(result)
-      // })
-      app.get('/userchart/:email', async (req, res) => {
+
+      app.get('/userchart/:email', verifyToken, async (req, res) => {
         try {
           const email = req.params.email;
           const query = { user_email: email, review_status: { $exists: true } };
@@ -473,7 +375,7 @@ app.get('/top-creators', async (req, res) => {
       });
       
     // final booking sorting for creator****************
-    app.get('/myContestSubmitted/:email', async (req, res) => {
+    app.get('/myContestSubmitted/:email', verifyToken, verifyCreator, async (req, res) => {
       const email = req.params.email;
       const query = {
         creator_email: email,
@@ -497,7 +399,7 @@ app.get('/top-creators', async (req, res) => {
     
 
     // generated jhamela holo onek
-    app.patch('/reviewstatus/:id', async (req, res) => {
+    app.patch('/reviewstatus/:id',verifyToken, verifyCreator, async (req, res) => {
       const id = req.params.id;
       const { review_status } = req.body;
 
@@ -514,23 +416,23 @@ app.get('/top-creators', async (req, res) => {
 
 
     //update result mark change by admin 
-    app.patch('/bookings-updates/:id', async (req, res) => {
-      const id = req.params.id
-      console.log(id);
-      const { booking } = req.body
-      const filter = { _id: new ObjectId(id) }
-      console.log(filter);
-      const updateDoc = {
-        $set: { review_status: booking.review_status }
+    // app.patch('/bookings-updates/:id', verifyToken, verifyAdmin, async (req, res) => {
+    //   const id = req.params.id
+    //   console.log(id);
+    //   const { booking } = req.body
+    //   const filter = { _id: new ObjectId(id) }
+    //   console.log(filter);
+    //   const updateDoc = {
+    //     $set: { review_status: booking.review_status }
 
-      }
+    //   }
 
 
-      const result = await bookingsCollection.updateOne(filter, updateDoc)
-      res.send(result)
-    })
+    //   const result = await bookingsCollection.updateOne(filter, updateDoc)
+    //   res.send(result)
+    // })
     // status change by admin
-    app.patch('/contests/accepted/:id', async (req, res) => {
+    app.patch('/contests/accepted/:id', verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) }
       const updatedDoc = {
@@ -543,17 +445,17 @@ app.get('/top-creators', async (req, res) => {
     })
 
     // newly code
-    app.get('/bookingsCreator', async (req, res) => {
-      const creatorEmail = req.query.creator_email;
+    // app.get('/bookingsCreator', async (req, res) => {
+    //   const creatorEmail = req.query.creator_email;
 
-      if (!creatorEmail) {
-        return res.status(400).send('creator_email query parameter is required');
-      }
+    //   if (!creatorEmail) {
+    //     return res.status(400).send('creator_email query parameter is required');
+    //   }
 
-      const result = await bookingsCollection.find({ creator_email: creatorEmail }).toArray();
-      res.json(result);
-    })
-    app.patch('/bookings/reviewed/:id', async (req, res) => {
+    //   const result = await bookingsCollection.find({ creator_email: creatorEmail }).toArray();
+    //   res.json(result);
+    // })
+    app.patch('/bookings/reviewed/:id', verifyToken, verifyCreator, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) }
       const updatedDoc = {
@@ -566,17 +468,8 @@ app.get('/top-creators', async (req, res) => {
     })
 
 
-    app.get("/submitPending", async (req, res) => {
-      // if (user.email !== creator_email) {
-      //     return res.status(401).json({ message: 'Unauthorized' });
-      // }
-      const result = await bookingsCollection.find({ review_status: "Pending" }).toArray();
-      res.json(result);
-
-    });
-    // ========i thik no need submitPending
-
-    app.patch('/contests/:id', async (req, res) => {
+   
+    app.patch('/contests/:id', verifyToken, verifyCreator, async (req, res) => {
       const data = req.body;
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) }
@@ -597,33 +490,49 @@ app.get('/top-creators', async (req, res) => {
       res.send(result);
     })
 
-    app.delete('/contests/:id', verifyToken, verifyAdmin, async (req, res) => {
+  // user's role update. only admin parbe
+  app.patch('/users/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
+    const id = req.params.id;
+    const filter = { _id: new ObjectId(id) };
+    const updatedDoc = {
+      $set: {
+        role: 'admin'
+      }
+    }
+    const result = await usersCollection.updateOne(filter, updatedDoc);
+    res.send(result);
+  })
+  app.patch('/users/creator/:id', verifyToken, verifyAdmin, async (req, res) => {
+    const id = req.params.id;
+    const filter = { _id: new ObjectId(id) };
+    const updatedDoc = {
+      $set: {
+        role: 'creator'
+      }
+    }
+    const result = await usersCollection.updateOne(filter, updatedDoc);
+    res.send(result);
+  })
+  app.patch('/users/user/:id', verifyToken, verifyAdmin, async (req, res) => {
+    const id = req.params.id;
+    const filter = { _id: new ObjectId(id) };
+    const updatedDoc = {
+      $set: {
+        role: 'user'
+      }
+    }
+    const result = await usersCollection.updateOne(filter, updatedDoc);
+    res.send(result);
+  })
+    
+    
+    app.delete('/contests/:id', verifyToken, verifyCreator, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await contestCollection.deleteOne(query);
       res.send(result);
-    })
-
-
-    app.patch('/users/update/:id', async (req, res) => {
-      const email = req.params.email
-      const user = req.body
-      const query = { email }
-      const updateDoc = {
-        $set: { ...user, timestamp: Date.now() },
-      }
-      const result = await usersCollection.updateOne(query, updateDoc)
-      res.send(result)
     })
     
-    app.delete('/contests/:id', async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) }
-      const result = await contestCollection.deleteOne(query);
-      res.send(result);
-    })
-    // modal by admin delete
-
     // payment intent
     app.post('/create-payment-intent', async (req, res) => {
       const { price } = req.body;
@@ -641,7 +550,7 @@ app.get('/top-creators', async (req, res) => {
       })
     });
 
-    app.get('/bookings/:email', async (req, res) => {
+    app.get('/bookings/:email', verifyToken, async (req, res) => {
       const email = req.params.email;
       const currentDate = new Date();
       const result = await bookingsCollection.find({ user_email: email }).sort({ contestDeadline: 1 }).toArray();
@@ -651,19 +560,19 @@ app.get('/top-creators', async (req, res) => {
 
     // api email creator
 
-    app.get('/bookingSubmitted/:email', async (req, res) => {
+    app.get('/bookingSubmitted/:email', verifyToken, verifyCreator, async (req, res) => {
       const email = req.params.email;
       const result = await bookingsCollection.find({ creator_email: email }).toArray();
       res.send(result);
 
     })
 
-    app.get('/bookings', async (req, res) => {
+    app.get('/bookings', verifyToken, verifyCreator, async (req, res) => {
       const result = await bookingsCollection.find().toArray();
       res.send(result);
     })
 
-    app.post('/booking', async (req, res) => {
+    app.post('/booking', verifyToken, async (req, res) => {
       const bookingData = req.body
       const result = await bookingsCollection.insertOne(bookingData)
       res.send(result)
